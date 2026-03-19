@@ -1,0 +1,9 @@
+incoming/*
+photo/*
+video/*
+
+!incoming/.gitkeep 
+!photo/.gitkeep 
+!video/.gitkeep 
+
+.DS_Store
