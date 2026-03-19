@@ -10,4 +10,4 @@ video/*
 
 
 damn.db
-__pyacache__/
+__pycache__/
