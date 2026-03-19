@@ -7,3 +7,7 @@ video/*
 !video/.gitkeep 
 
 .DS_Store
+
+
+damn.db
+__pyacach__/
