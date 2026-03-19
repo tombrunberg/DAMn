@@ -25,6 +25,7 @@ DAMn/
 ## Features
 
 ### Organization
+- **Recursive import**: Processes files at unlimited depth in incoming folder
 - **Automatic file type detection**: Supports common photo and video formats
 - **Date-based organization**: Files organized as `YYYY/YYYY-MM/YYYY-MM-DD`
 - **Smart date extraction**:
@@ -32,6 +33,7 @@ DAMn/
   - Videos: Reads creation_time from metadata (requires ffprobe)
   - Fallback: Uses file modification time
 - **Filename conflict handling**: Adds counter suffix if different files have same name
+- **Automatic cleanup**: Removes imported files and empty folders from incoming
 
 ### Duplicate Detection
 - **Hash-based detection**: Uses SHA256 hash of actual image data
@@ -42,10 +44,12 @@ DAMn/
 
 ### Tagging & Database
 - **SQLite database**: Tracks all files with metadata
+- **Auto-tagging from folders**: Folder names automatically become tags (normalized to kebab-case)
 - **Multi-tag support**: Add unlimited tags to any file
 - **Fast search**: Search by tags with AND/OR logic
 - **Metadata storage**: Stores hash, dimensions, camera info, dates
 - **Tag management**: Add, remove, search, and list tags via CLI
+- **Smart tag normalization**: Converts to lowercase, replaces spaces with hyphens, skips date patterns
 
 ## Installation
 
@@ -132,15 +136,54 @@ If you have files that were organized before the database existed, use `scan.py`
 
 ## Workflow
 
-1. Drop photos/videos into `incoming/` folder
+### Basic Workflow
+1. Drop photos/videos into `incoming/` folder (can be nested in subfolders!)
 2. Run `./import.py`
 3. Files are automatically:
+   - Recursively discovered (unlimited depth)
    - Hashed and checked for duplicates in database
    - Metadata extracted (EXIF, dimensions, camera info)
+   - Auto-tagged from folder names
    - Organized by date into folder structure
    - Added to database with all metadata
-4. Tag files using `./tag.py add <path> <tags>`
+   - Cleaned up from incoming (empty folders removed)
+4. Optionally add more tags: `./tag.py add <path> <tags>`
 5. Search and browse using `./tag.py search` or `./tag.py files`
+
+### Auto-Tagging from Folders
+
+Files are automatically tagged based on their folder path in `incoming/`:
+
+```
+incoming/vacation/beach/photo.jpg     → tags: vacation, beach
+incoming/family/2024/reunion.jpg      → tags: family (skips "2024")
+incoming/Work Stuff/screenshot.png    → tags: work-stuff (normalized)
+```
+
+**Tag normalization rules:**
+- Converted to lowercase
+- Spaces and underscores → hyphens (kebab-case)
+- Special characters removed
+- Date folders (YYYY, YYYY-MM, YYYY-MM-DD) are skipped
+
+### Bulk Import with rsync
+
+```bash
+# On source machine, organize files in folders
+source/
+├── vacation/
+│   ├── beach/
+│   └── city/
+└── work/
+
+# rsync to incoming (preserves timestamps)
+rsync -av --progress source/ server:/path/to/DAMn/incoming/
+
+# On server, run import
+./import.py
+
+# Result: All files auto-tagged by folder structure!
+```
 
 ## Supported Formats
 

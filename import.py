@@ -14,7 +14,8 @@ from typing import Optional, Tuple, Dict
 import mimetypes
 
 # Import database module
-from database import FileDB, init_database
+from database import FileDB, FileTagDB, init_database
+import re
 
 # Try to import PIL for EXIF data
 try:
@@ -210,12 +211,102 @@ def get_file_type(file_path: Path) -> Optional[str]:
         return None
 
 
-def import_file(file_path: Path, dry_run: bool = False) -> bool:
+def normalize_tag_name(name: str) -> str:
+    """
+    Normalize a tag name to lowercase kebab-case.
+    - Convert to lowercase
+    - Replace spaces and underscores with hyphens
+    - Remove special characters (keep only letters, numbers, hyphens)
+    """
+    # Convert to lowercase
+    name = name.lower()
+
+    # Replace spaces and underscores with hyphens
+    name = name.replace(' ', '-').replace('_', '-')
+
+    # Remove all characters except letters, numbers, and hyphens
+    name = re.sub(r'[^a-z0-9-]', '', name)
+
+    # Remove multiple consecutive hyphens
+    name = re.sub(r'-+', '-', name)
+
+    # Remove leading/trailing hyphens
+    name = name.strip('-')
+
+    return name
+
+
+def is_date_folder(folder_name: str) -> bool:
+    """
+    Check if a folder name looks like a date pattern.
+    Returns True for: YYYY, YYYY-MM, YYYY-MM-DD, YYYY_MM_DD
+    """
+    # Year: 4 digits
+    if re.match(r'^\d{4}$', folder_name):
+        return True
+
+    # YYYY-MM or YYYY_MM
+    if re.match(r'^\d{4}[-_]\d{2}$', folder_name):
+        return True
+
+    # YYYY-MM-DD or YYYY_MM_DD
+    if re.match(r'^\d{4}[-_]\d{2}[-_]\d{2}$', folder_name):
+        return True
+
+    return False
+
+
+def extract_tags_from_path(file_path: Path, incoming_dir: Path) -> list[str]:
+    """
+    Extract folder names from path as tags.
+    Skip the incoming directory itself and any date-pattern folders.
+
+    Example: incoming/vacation/Beach Photos/img.jpg
+    Returns: ['vacation', 'beach-photos']
+    """
+    tags = []
+
+    try:
+        # Get the relative path from incoming directory
+        relative = file_path.relative_to(incoming_dir)
+
+        # Get all parent folders (excluding the file itself)
+        folders = relative.parts[:-1]  # Exclude filename
+
+        for folder in folders:
+            # Skip date-like folders
+            if is_date_folder(folder):
+                continue
+
+            # Normalize and add as tag
+            tag = normalize_tag_name(folder)
+            if tag:  # Only add non-empty tags
+                tags.append(tag)
+
+    except ValueError:
+        # File is not relative to incoming_dir
+        pass
+
+    return tags
+
+
+def import_file(file_path: Path, dry_run: bool = False, tags: list[str] = None) -> bool:
     """
     Import a single file from incoming directory.
+
+    Args:
+        file_path: Path to file to import
+        dry_run: If True, don't actually move files or modify database
+        tags: Optional list of tags to apply to the file after import
+
     Returns True if file was imported, False otherwise.
     """
+    if tags is None:
+        tags = []
+
     print(f"\nProcessing: {file_path.name}")
+    if tags:
+        print(f"  Tags: {', '.join(tags)}")
 
     # Determine file type
     file_type = get_file_type(file_path)
@@ -310,21 +401,70 @@ def import_file(file_path: Path, dry_run: bool = False) -> bool:
 
         if file_id:
             print(f"  ✓ Imported successfully (DB ID: {file_id})")
+
+            # Apply tags if provided
+            if tags:
+                for tag in tags:
+                    FileTagDB.add_tag_to_file(file_id, tag)
+                print(f"  ✓ Tagged with: {', '.join(tags)}")
         else:
             print(f"  ✓ File moved (warning: already in database)")
     else:
         print(f"  [DRY RUN] Would move to {target_path}")
+        if tags:
+            print(f"  [DRY RUN] Would tag with: {', '.join(tags)}")
 
     return True
 
 
+def cleanup_incoming_directory(imported_files: list[Path]):
+    """
+    Clean up the incoming directory after successful import.
+    Removes empty directories bottom-up.
+
+    Args:
+        imported_files: List of file paths that were successfully imported (and moved)
+    """
+    print(f"\nCleaning up incoming directory...")
+
+    # Get all unique parent directories from imported files
+    directories = set()
+    for file_path in imported_files:
+        # Get all parent directories between the file and INCOMING_DIR
+        current = file_path.parent
+        while current != INCOMING_DIR and current.is_relative_to(INCOMING_DIR):
+            directories.add(current)
+            current = current.parent
+
+    # Sort directories by depth (deepest first) for bottom-up removal
+    sorted_dirs = sorted(directories, key=lambda d: len(d.parts), reverse=True)
+
+    removed_count = 0
+    for directory in sorted_dirs:
+        try:
+            # Only remove if directory is empty
+            if directory.exists() and not any(directory.iterdir()):
+                directory.rmdir()
+                print(f"  Removed empty directory: {directory.relative_to(INCOMING_DIR)}")
+                removed_count += 1
+        except Exception as e:
+            # Directory not empty or other error - skip silently
+            pass
+
+    if removed_count > 0:
+        print(f"✓ Cleaned up {removed_count} empty directories")
+    else:
+        print(f"  No empty directories to remove")
+
+
 def import_all(dry_run: bool = False):
-    """Import all files from incoming directory."""
+    """Import all files from incoming directory recursively."""
     if not INCOMING_DIR.exists():
         print(f"Error: Incoming directory does not exist: {INCOMING_DIR}")
         return
 
-    files = [f for f in INCOMING_DIR.iterdir() if f.is_file()]
+    # Recursively find all files in incoming directory
+    files = [f for f in INCOMING_DIR.rglob('*') if f.is_file()]
 
     if not files:
         print("No files to import in incoming directory.")
@@ -336,10 +476,17 @@ def import_all(dry_run: bool = False):
 
     imported = 0
     skipped = 0
+    imported_files = []  # Track successfully imported files for cleanup
 
     for file_path in files:
-        if import_file(file_path, dry_run):
+        # Extract tags from folder structure
+        tags = extract_tags_from_path(file_path, INCOMING_DIR)
+
+        # Import file with auto-tags
+        if import_file(file_path, dry_run, tags):
             imported += 1
+            if not dry_run:
+                imported_files.append(file_path)
         else:
             skipped += 1
 
@@ -348,6 +495,12 @@ def import_all(dry_run: bool = False):
     print(f"  Imported: {imported}")
     print(f"  Skipped: {skipped}")
     print(f"  Total: {len(files)}")
+
+    # Clean up imported files and empty directories
+    if not dry_run and imported_files:
+        cleanup_incoming_directory(imported_files)
+    elif dry_run and imported_files:
+        print(f"\n[DRY RUN] Would clean up {len(imported_files)} imported files and empty directories")
 
 
 def main():
