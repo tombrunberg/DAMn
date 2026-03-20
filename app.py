@@ -157,16 +157,34 @@ async def get_files(
     query += " ORDER BY f.capture_date DESC, f.file_name"
 
     # Get total count
-    count_query = query.replace(
-        "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
-        "SELECT COUNT(DISTINCT f.id)"
-    ).replace(
-        "SELECT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
-        "SELECT COUNT(DISTINCT f.id)"
-    )
-    # Remove ORDER BY for count query
-    if " ORDER BY " in count_query:
-        count_query = count_query.split(" ORDER BY ")[0]
+    # When using GROUP BY with HAVING, we need to wrap the query in a subquery
+    if " GROUP BY " in query:
+        # For grouped queries, count the grouped results
+        count_query = query.replace(
+            "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
+            "SELECT f.id"
+        ).replace(
+            "SELECT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
+            "SELECT f.id"
+        )
+        # Remove ORDER BY for count query
+        if " ORDER BY " in count_query:
+            count_query = count_query.split(" ORDER BY ")[0]
+
+        # Wrap in subquery to count results
+        count_query = f"SELECT COUNT(*) FROM ({count_query})"
+    else:
+        # For non-grouped queries, use simple COUNT
+        count_query = query.replace(
+            "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
+            "SELECT COUNT(DISTINCT f.id)"
+        ).replace(
+            "SELECT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
+            "SELECT COUNT(DISTINCT f.id)"
+        )
+        # Remove ORDER BY for count query
+        if " ORDER BY " in count_query:
+            count_query = count_query.split(" ORDER BY ")[0]
 
     cursor.execute(count_query, params)
     total = cursor.fetchone()[0]
