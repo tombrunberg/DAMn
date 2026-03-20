@@ -17,16 +17,16 @@ from database import FileDB, TagDB, FileTagDB
 
 # Configuration
 BASE_DIR = Path(__file__).parent
-DB_PATH = BASE_DIR / "dam.db"
+DB_PATH = BASE_DIR / "damn.db"
 
 # Initialize FastAPI
 app = FastAPI(title="DAMn - Digital Asset Manager")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-# Database instances
-file_db = FileDB(str(DB_PATH))
-tag_db = TagDB(str(DB_PATH))
-file_tag_db = FileTagDB(str(DB_PATH))
+# Database classes (used as static classes, no instantiation needed)
+file_db = FileDB
+tag_db = TagDB
+file_tag_db = FileTagDB
 
 
 # Pydantic models for API requests
