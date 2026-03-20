@@ -23,6 +23,10 @@ DB_PATH = BASE_DIR / "damn.db"
 app = FastAPI(title="DAMn - Digital Asset Manager")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+# Mount static directories for serving images and videos
+app.mount("/static/photo", StaticFiles(directory=str(BASE_DIR / "photo")), name="photos")
+app.mount("/static/video", StaticFiles(directory=str(BASE_DIR / "video")), name="videos")
+
 # Database classes (used as static classes, no instantiation needed)
 file_db = FileDB
 tag_db = TagDB
@@ -57,6 +61,7 @@ async def get_stats():
 async def get_files(
     file_type: Optional[str] = None,
     tag: Optional[str] = None,
+    folder: Optional[str] = None,
     page: int = 1,
     per_page: int = 50
 ):
@@ -66,6 +71,7 @@ async def get_files(
     Args:
         file_type: Filter by 'photo' or 'video'
         tag: Filter by tag name
+        folder: Filter by folder path (e.g., 'photo/2024/2024-03')
         page: Page number (1-indexed)
         per_page: Items per page
     """
@@ -79,7 +85,7 @@ async def get_files(
     query = """
         SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type,
                f.file_size, f.capture_date, f.width, f.height,
-               f.camera_make, f.camera_model
+               f.camera_make, f.camera_model, f.duration
         FROM files f
     """
 
@@ -98,6 +104,10 @@ async def get_files(
         where_clauses.append("f.file_type = ?")
         params.append(file_type)
 
+    if folder:
+        where_clauses.append("f.file_path LIKE ?")
+        params.append(f'%{folder}%')
+
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
 
@@ -105,7 +115,7 @@ async def get_files(
 
     # Get total count
     count_query = query.replace(
-        "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model",
+        "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
         "SELECT COUNT(DISTINCT f.id)"
     )
     cursor.execute(count_query, params)
@@ -125,6 +135,24 @@ async def get_files(
         file_tags = file_tag_db.get_file_tags(file_data['id'])
         file_data['tags'] = file_tags  # Already returns list of tag names
 
+        # Convert file path to relative web path for serving
+        # Example: /opt/homebrew/var/www/DAMn/photo/2024/... -> /static/photo/2024/...
+        file_path = Path(file_data['file_path'])
+        path_parts = file_path.parts
+
+        # Find where 'photo' or 'video' starts
+        base_idx = -1
+        for i, part in enumerate(path_parts):
+            if part in ('photo', 'video'):
+                base_idx = i
+                break
+
+        if base_idx >= 0:
+            relative_path = '/'.join(path_parts[base_idx:])
+            file_data['web_path'] = f'/static/{relative_path}'
+        else:
+            file_data['web_path'] = None
+
         files.append(file_data)
 
     conn.close()
@@ -143,6 +171,34 @@ async def get_tags():
     """Get all tags with file counts"""
     tags = tag_db.get_all_tags()
     return {"tags": tags}
+
+
+@app.get("/api/folders")
+async def get_folders():
+    """Get all unique folder paths with file counts"""
+    folders = file_db.get_folders()
+    return {"folders": folders}
+
+
+@app.get("/api/files/folder/select-all")
+async def get_folder_file_ids(folder: Optional[str] = None):
+    """
+    Get all file IDs in a folder for select-all functionality
+
+    Args:
+        folder: Folder path to get all IDs from (e.g., 'photo/2024/2024-03')
+    """
+    if folder:
+        file_ids = file_db.get_files_in_folder(folder)
+    else:
+        # No folder specified - get all files
+        conn = sqlite3.connect(str(DB_PATH))
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM files")
+        file_ids = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+    return {"file_ids": file_ids, "count": len(file_ids)}
 
 
 @app.post("/api/tags/add")

@@ -305,7 +305,7 @@ Examples:
 
     # Show current stats
     stats = FileDB.get_stats()
-    print(f"Current database: {stats['total_files']} files ({stats['photos']} photos, {stats['videos']} videos)")
+    print(f"Current database: {stats['total_files']} files ({stats['total_photos']} photos, {stats['total_videos']} videos)")
 
     if args.dry_run:
         print("\n*** DRY RUN MODE - No files will be added to database ***")
@@ -349,7 +349,7 @@ Examples:
     # Show updated stats
     if not args.dry_run:
         stats = FileDB.get_stats()
-        print(f"\nUpdated database: {stats['total_files']} files ({stats['photos']} photos, {stats['videos']} videos)")
+        print(f"\nUpdated database: {stats['total_files']} files ({stats['total_photos']} photos, {stats['total_videos']} videos)")
 
 
 if __name__ == "__main__":

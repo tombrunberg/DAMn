@@ -92,6 +92,7 @@ def init_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_capture_date ON files(capture_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_path ON files(file_path)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_file_tags_file ON file_tags(file_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_file_tags_tag ON file_tags(tag_id)")
@@ -243,10 +244,79 @@ class FileDB:
 
             return {
                 'total_files': total,
-                'photos': photos,
-                'videos': videos,
-                'tags': tags
+                'total_photos': photos,
+                'total_videos': videos,
+                'total_tags': tags
             }
+
+    @staticmethod
+    def get_folders() -> List[Dict]:
+        """
+        Extract unique folder paths from file_path.
+        Returns list of {path: str, count: int, type: str}.
+        """
+        with get_db() as conn:
+            cursor = conn.cursor()
+
+            # Get all file paths and extract folder structure
+            cursor.execute("SELECT file_path, file_type FROM files")
+            rows = cursor.fetchall()
+
+            folder_counts = {}
+
+            for row in rows:
+                file_path = row['file_path']
+                file_type = row['file_type']
+
+                # Extract folder path (everything before the filename)
+                # Example: /opt/homebrew/var/www/DAMn/photo/2024/2024-03/2024-03-15/file.jpg
+                # -> photo/2024/2024-03/2024-03-15
+                path_parts = Path(file_path).parts
+
+                # Find where 'photo' or 'video' starts and take everything after that
+                base_idx = -1
+                for i, part in enumerate(path_parts):
+                    if part in ('photo', 'video'):
+                        base_idx = i
+                        break
+
+                if base_idx >= 0:
+                    # Get folder path relative to base (photo/2024/2024-03/2024-03-15)
+                    folder_parts = path_parts[base_idx:-1]  # Exclude filename
+                    folder_path = '/'.join(folder_parts) if folder_parts else ''
+
+                    if folder_path:
+                        key = (folder_path, file_type)
+                        folder_counts[key] = folder_counts.get(key, 0) + 1
+
+            # Convert to list of dicts
+            result = []
+            for (path, ftype), count in sorted(folder_counts.items()):
+                result.append({
+                    'path': path,
+                    'count': count,
+                    'type': ftype
+                })
+
+            return result
+
+    @staticmethod
+    def get_files_in_folder(folder_path: str) -> List[int]:
+        """
+        Get all file IDs in a specific folder.
+        folder_path should be relative (e.g., 'photo/2024/2024-03/2024-03-15').
+        Returns list of file IDs.
+        """
+        with get_db() as conn:
+            cursor = conn.cursor()
+
+            # Use LIKE to match folder path
+            cursor.execute("""
+                SELECT id FROM files
+                WHERE file_path LIKE ?
+            """, (f'%{folder_path}%',))
+
+            return [row['id'] for row in cursor.fetchall()]
 
 
 class TagDB:

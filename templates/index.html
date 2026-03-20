@@ -119,67 +119,162 @@
             background: #545b62;
         }
 
-        .file-list {
+        .breadcrumb {
             background: white;
+            padding: 15px 20px;
+            margin-bottom: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .file-list-header {
-            display: grid;
-            grid-template-columns: 40px 1fr 150px 200px auto;
-            gap: 15px;
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             font-size: 14px;
         }
 
-        .file-item {
-            display: grid;
-            grid-template-columns: 40px 1fr 150px 200px auto;
-            gap: 15px;
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            align-items: center;
+        .breadcrumb-item {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
             transition: background 0.2s;
         }
 
-        .file-item:hover {
-            background: #f8f9fa;
+        .breadcrumb-item:hover {
+            background: #e9ecef;
         }
 
-        .file-item:last-child {
-            border-bottom: none;
+        .breadcrumb-item.active {
+            font-weight: 600;
+            color: #007bff;
         }
 
-        .file-item.selected {
-            background: #e7f3ff;
+        .breadcrumb-separator {
+            color: #999;
         }
 
-        .file-name {
-            font-weight: 500;
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .gallery-item {
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%; /* 1:1 aspect ratio */
+            background: #f5f5f5;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .gallery-item.selected {
+            box-shadow: 0 0 0 3px #007bff;
+        }
+
+        .gallery-item-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-item-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            z-index: 10;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .gallery-item-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+            padding: 15px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .gallery-item:hover .gallery-item-overlay {
+            opacity: 1;
+        }
+
+        .gallery-item-filename {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 5px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
-        .file-path {
-            font-size: 12px;
-            color: #666;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .gallery-item-metadata {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .gallery-item-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 5px;
+        }
+
+        .gallery-video-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .gallery-video-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .gallery-video-label {
+            font-weight: 600;
+            font-size: 16px;
         }
 
         .file-type {
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 3px;
-            font-size: 12px;
-            font-weight: 500;
+            font-size: 10px;
+            font-weight: 600;
             text-align: center;
+            display: inline-block;
         }
 
         .file-type.photo {
@@ -190,11 +285,6 @@
         .file-type.video {
             background: #d1ecf1;
             color: #0c5460;
-        }
-
-        .file-date {
-            font-size: 13px;
-            color: #666;
         }
 
         .file-tags {
@@ -286,20 +376,18 @@
                 <button onclick="addTags()" id="addTagsBtn" disabled>Add Tags</button>
                 <button onclick="removeTags()" class="secondary" id="removeTagsBtn" disabled>Remove Tags</button>
                 <button onclick="deleteFiles()" class="danger" id="deleteBtn" disabled>Delete Selected</button>
+                <button onclick="selectAllInFolder()" id="selectAllFolderBtn">Select All in View</button>
             </div>
         </div>
 
-        <div class="file-list">
-            <div class="file-list-header">
-                <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
-                <div>File</div>
-                <div>Type</div>
-                <div>Date</div>
-                <div>Tags</div>
-            </div>
-            <div id="fileListBody">
-                <div class="loading">Loading files...</div>
-            </div>
+        <!-- Breadcrumb Navigation -->
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item active" onclick="navigateToFolder(null)">All Files</span>
+        </div>
+
+        <!-- Gallery Grid -->
+        <div class="gallery-grid" id="galleryGrid">
+            <div class="loading">Loading files...</div>
         </div>
 
         <div class="pagination" id="pagination" style="display: none;">
@@ -314,6 +402,7 @@
         let totalPages = 1;
         let selectedFiles = new Set();
         let allFiles = [];
+        let currentFolder = null;
 
         // Load stats on page load
         async function loadStats() {
@@ -350,6 +439,42 @@
             }
         }
 
+        // Navigate to a folder
+        function navigateToFolder(folderPath) {
+            currentFolder = folderPath;
+            currentPage = 1;
+            updateBreadcrumb();
+            loadFiles();
+        }
+
+        // Update breadcrumb navigation
+        function updateBreadcrumb() {
+            const breadcrumb = document.getElementById('breadcrumb');
+
+            if (!currentFolder) {
+                breadcrumb.innerHTML = '<span class="breadcrumb-item active">All Files</span>';
+                return;
+            }
+
+            const parts = currentFolder.split('/');
+            let html = '<span class="breadcrumb-item" onclick="navigateToFolder(null)">All Files</span>';
+
+            let pathSoFar = '';
+            parts.forEach((part, index) => {
+                pathSoFar += (index > 0 ? '/' : '') + part;
+                const isLast = index === parts.length - 1;
+                const path = pathSoFar;
+
+                if (isLast) {
+                    html += ` <span class="breadcrumb-separator">›</span> <span class="breadcrumb-item active">${escapeHtml(part)}</span>`;
+                } else {
+                    html += ` <span class="breadcrumb-separator">›</span> <span class="breadcrumb-item" onclick="navigateToFolder('${path}')">${escapeHtml(part)}</span>`;
+                }
+            });
+
+            breadcrumb.innerHTML = html;
+        }
+
         // Load files
         async function loadFiles() {
             const fileType = document.getElementById('filterType').value;
@@ -362,6 +487,7 @@
 
             if (fileType) params.append('file_type', fileType);
             if (tag) params.append('tag', tag);
+            if (currentFolder) params.append('folder', currentFolder);
 
             try {
                 const response = await fetch(`/api/files?${params}`);
@@ -372,18 +498,17 @@
 
                 renderFiles(data.files);
                 updatePagination(data);
-                selectedFiles.clear();
                 updateSelectionUI();
             } catch (error) {
                 console.error('Error loading files:', error);
-                document.getElementById('fileListBody').innerHTML =
+                document.getElementById('galleryGrid').innerHTML =
                     '<div class="empty-state">Error loading files</div>';
             }
         }
 
-        // Render file list
+        // Render gallery
         function renderFiles(files) {
-            const container = document.getElementById('fileListBody');
+            const container = document.getElementById('galleryGrid');
 
             if (files.length === 0) {
                 container.innerHTML = '<div class="empty-state">No files found</div>';
@@ -391,22 +516,43 @@
                 return;
             }
 
-            container.innerHTML = files.map(file => `
-                <div class="file-item ${selectedFiles.has(file.id) ? 'selected' : ''}" data-file-id="${file.id}">
-                    <input type="checkbox"
-                           ${selectedFiles.has(file.id) ? 'checked' : ''}
-                           onchange="toggleFileSelection(${file.id}, this.checked)">
-                    <div>
-                        <div class="file-name">${escapeHtml(file.file_name)}</div>
-                        <div class="file-path">${escapeHtml(file.file_path)}</div>
+            container.innerHTML = files.map(file => {
+                const isVideo = file.file_type === 'video';
+                const imageContent = isVideo
+                    ? `<div class="gallery-video-placeholder">
+                          <div class="gallery-video-icon">▶</div>
+                          <div class="gallery-video-label">VIDEO</div>
+                       </div>`
+                    : `<img src="${file.web_path}" alt="${escapeHtml(file.file_name)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22><rect fill=%22%23ddd%22 width=%22300%22 height=%22300%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>Image not found</text></svg>'">`;
+
+                const metadata = [];
+                if (file.width && file.height) metadata.push(`${file.width}×${file.height}`);
+                if (isVideo && file.duration) metadata.push(`${Math.round(file.duration)}s`);
+
+                return `
+                    <div class="gallery-item ${selectedFiles.has(file.id) ? 'selected' : ''}" data-file-id="${file.id}">
+                        <input type="checkbox"
+                               class="gallery-item-checkbox"
+                               ${selectedFiles.has(file.id) ? 'checked' : ''}
+                               onchange="toggleFileSelection(${file.id}, this.checked)"
+                               onclick="event.stopPropagation()">
+                        <div class="gallery-item-content" onclick="${isVideo ? `window.open('${file.web_path}', '_blank')` : `window.open('${file.web_path}', '_blank')`}">
+                            ${imageContent}
+                            <div class="gallery-item-overlay">
+                                <div class="gallery-item-filename">${escapeHtml(file.file_name)}</div>
+                                <div class="gallery-item-metadata">
+                                    <span class="file-type ${file.file_type}">${file.file_type.toUpperCase()}</span>
+                                    ${metadata.length > 0 ? ` • ${metadata.join(' • ')}` : ''}
+                                    ${file.capture_date ? ` • ${formatDate(file.capture_date)}` : ''}
+                                </div>
+                                <div class="gallery-item-tags">
+                                    ${file.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="file-type ${file.file_type}">${file.file_type}</div>
-                    <div class="file-date">${formatDate(file.capture_date)}</div>
-                    <div class="file-tags">
-                        ${file.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // Update pagination controls
@@ -443,13 +589,37 @@
             updateSelectionUI();
         }
 
-        // Toggle select all
-        function toggleSelectAll(checkbox) {
-            allFiles.forEach(file => {
-                toggleFileSelection(file.id, checkbox.checked);
-                const cb = document.querySelector(`[data-file-id="${file.id}"] input[type="checkbox"]`);
-                if (cb) cb.checked = checkbox.checked;
-            });
+        // Select all files in current folder
+        async function selectAllInFolder() {
+            try {
+                const params = new URLSearchParams();
+                if (currentFolder) params.append('folder', currentFolder);
+
+                const response = await fetch(`/api/files/folder/select-all?${params}`);
+                const data = await response.json();
+
+                // Add all file IDs to selection
+                data.file_ids.forEach(id => selectedFiles.add(id));
+
+                // Update checkboxes for visible files
+                allFiles.forEach(file => {
+                    if (selectedFiles.has(file.id)) {
+                        const cb = document.querySelector(`[data-file-id="${file.id}"] .gallery-item-checkbox`);
+                        if (cb) cb.checked = true;
+                        const item = document.querySelector(`[data-file-id="${file.id}"]`);
+                        if (item) item.classList.add('selected');
+                    }
+                });
+
+                updateSelectionUI();
+
+                if (data.count > 50) {
+                    alert(`Selected ${data.count} files in current folder. Note: Some files may be on other pages.`);
+                }
+            } catch (error) {
+                console.error('Error selecting all in folder:', error);
+                alert('Error selecting all files');
+            }
         }
 
         // Update selection UI
@@ -462,11 +632,6 @@
             document.getElementById('addTagsBtn').disabled = !hasSelection;
             document.getElementById('removeTagsBtn').disabled = !hasSelection;
             document.getElementById('deleteBtn').disabled = !hasSelection;
-
-            // Update select all checkbox
-            const selectAllCb = document.getElementById('selectAll');
-            selectAllCb.checked = allFiles.length > 0 && count === allFiles.length;
-            selectAllCb.indeterminate = count > 0 && count < allFiles.length;
         }
 
         // Add tags
