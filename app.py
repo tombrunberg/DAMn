@@ -123,7 +123,7 @@ async def get_files(
 
         # Get tags for this file
         file_tags = file_tag_db.get_file_tags(file_data['id'])
-        file_data['tags'] = [tag['name'] for tag in file_tags]
+        file_data['tags'] = file_tags  # Already returns list of tag names
 
         files.append(file_data)
 
