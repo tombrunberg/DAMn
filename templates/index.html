@@ -690,6 +690,7 @@
         function navigateToFolder(folderPath) {
             currentFolder = folderPath;
             currentPage = 1;
+            clearAllSelections(); // Clear selections when changing folders
             updateBreadcrumb();
             loadFiles();
             // Re-render folder tree to update active state
@@ -821,6 +822,23 @@
             loadFiles();
         }
 
+        // Clear all selections (helper function)
+        function clearAllSelections() {
+            selectedFiles.clear();
+
+            // Uncheck all visible checkboxes
+            document.querySelectorAll('.gallery-item-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+
+            // Remove selected class from all gallery items
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+
+            updateSelectionUI();
+        }
+
         // Toggle file selection
         function toggleFileSelection(fileId, checked) {
             if (checked) {
@@ -911,6 +929,7 @@
                 const result = await response.json();
                 alert(result.message);
                 input.value = '';
+                clearAllSelections(); // Clear selections after tagging
                 loadFiles();
                 loadStats();
                 loadTags();
@@ -947,6 +966,7 @@
                 const result = await response.json();
                 alert(result.message);
                 input.value = '';
+                clearAllSelections(); // Clear selections after removing tags
                 loadFiles();
                 loadStats();
                 loadTags();
@@ -982,6 +1002,7 @@
                     console.error('Deletion errors:', result.errors);
                 }
 
+                clearAllSelections(); // Clear selections after deleting files
                 loadFiles();
                 loadStats();
             } catch (error) {
