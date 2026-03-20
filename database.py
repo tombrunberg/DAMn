@@ -169,6 +169,18 @@ class FileDB:
             return None
 
     @staticmethod
+    def find_by_id(file_id: int) -> Optional[Dict]:
+        """Find a file by its ID. Returns file record or None."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM files WHERE id = ?", (file_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return dict(row)
+            return None
+
+    @staticmethod
     def update_file_path(hash: str, new_path: str) -> bool:
         """Update the file path for a file (when moved). Returns success status."""
         with get_db() as conn:

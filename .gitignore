@@ -8,6 +8,5 @@ video/*
 
 .DS_Store
 
-
 damn.db
 __pycache__/
