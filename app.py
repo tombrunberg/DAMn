@@ -61,7 +61,9 @@ async def get_stats():
 async def get_files(
     file_type: Optional[str] = None,
     tag: Optional[str] = None,
+    tags: Optional[str] = None,
     folder: Optional[str] = None,
+    max_tags: Optional[int] = None,
     page: int = 1,
     per_page: int = 50
 ):
@@ -70,8 +72,10 @@ async def get_files(
 
     Args:
         file_type: Filter by 'photo' or 'video'
-        tag: Filter by tag name
+        tag: Filter by single tag name (for backward compatibility)
+        tags: Filter by multiple tags (comma-separated, requires ALL tags)
         folder: Filter by folder path (e.g., 'photo/2024/2024-03')
+        max_tags: Filter files with less than this many tags
         page: Page number (1-indexed)
         per_page: Items per page
     """
@@ -92,13 +96,39 @@ async def get_files(
     where_clauses = []
     params = []
 
-    if tag:
+    # Track if we need to join file_tags
+    needs_tag_join = False
+
+    # Handle multiple tags filter (takes precedence over single tag)
+    if tags:
+        tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+        if tag_list:
+            placeholders = ','.join(['?' for _ in tag_list])
+            query += """
+                JOIN file_tags ft ON f.id = ft.file_id
+                JOIN tags t ON ft.tag_id = t.id
+            """
+            needs_tag_join = True
+            where_clauses.append(f"t.name IN ({placeholders})")
+            params.extend(tag_list)
+            # Add GROUP BY and HAVING to ensure ALL tags match
+            query = query.replace("SELECT DISTINCT", "SELECT")
+    elif tag:
         query += """
             JOIN file_tags ft ON f.id = ft.file_id
             JOIN tags t ON ft.tag_id = t.id
         """
+        needs_tag_join = True
         where_clauses.append("t.name = ?")
         params.append(tag)
+    elif max_tags:
+        # For max_tags filter without other tag filters
+        # Use LEFT JOIN to include files with zero tags
+        query += """
+            LEFT JOIN file_tags ft ON f.id = ft.file_id
+        """
+        needs_tag_join = True
+        query = query.replace("SELECT DISTINCT", "SELECT")
 
     if file_type:
         where_clauses.append("f.file_type = ?")
@@ -111,13 +141,33 @@ async def get_files(
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
 
+    # Add GROUP BY and HAVING for multiple tags to ensure ALL tags match
+    if tags:
+        tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+        if tag_list:
+            query += " GROUP BY f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration"
+            query += f" HAVING COUNT(DISTINCT t.id) = {len(tag_list)}"
+            if max_tags:
+                query += f" AND COUNT(DISTINCT ft.tag_id) < {max_tags}"
+    elif max_tags:
+        # Group by to count tags per file - using COALESCE to handle NULL (zero tags)
+        query += " GROUP BY f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration"
+        query += f" HAVING COALESCE(COUNT(DISTINCT ft.tag_id), 0) < {max_tags}"
+
     query += " ORDER BY f.capture_date DESC, f.file_name"
 
     # Get total count
     count_query = query.replace(
         "SELECT DISTINCT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
         "SELECT COUNT(DISTINCT f.id)"
+    ).replace(
+        "SELECT f.id, f.file_name, f.file_path, f.file_type, f.file_size, f.capture_date, f.width, f.height, f.camera_make, f.camera_model, f.duration",
+        "SELECT COUNT(DISTINCT f.id)"
     )
+    # Remove ORDER BY for count query
+    if " ORDER BY " in count_query:
+        count_query = count_query.split(" ORDER BY ")[0]
+
     cursor.execute(count_query, params)
     total = cursor.fetchone()[0]
 
